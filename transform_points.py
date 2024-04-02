@@ -1,5 +1,6 @@
 import numpy as np
 import open3d as o3d
+from pathlib import Path
 
 def reflect_points(points : np.array, plane_normal : np.array) -> np.array:
 
@@ -31,7 +32,7 @@ def load_ply(file_path):
 
 if __name__ == '__main__':
 
-    point_cloud, faces = load_ply()
+    point_cloud, faces = load_ply(r'data\parrot2.ply')
 
     plane_normal = find_plane(point_cloud)
     points = reflect_points(point_cloud, plane_normal)
