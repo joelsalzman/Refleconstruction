@@ -1,0 +1,2 @@
+def separate(img):
+    pass
