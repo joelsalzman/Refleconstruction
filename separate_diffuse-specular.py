@@ -1,2 +1,0 @@
-def separate(img):
-    pass

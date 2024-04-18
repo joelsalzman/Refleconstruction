@@ -1,5 +1,6 @@
 import numpy as np
 import open3d as o3d
+import cv2
 
 def load_ply(file_path):
 
@@ -7,3 +8,6 @@ def load_ply(file_path):
     vertices = np.asarray(mesh.vertices)
     return vertices
 
+def load_rgb(file_path):
+
+    return cv2.imread(file_path)
