@@ -63,15 +63,6 @@ def separate_layers(I, lambda_, beta_, i_max, eta_, lb, ub):
         
         # Equation 8
         nor2 = -np.diff(g1, axis=1) - np.diff(g2, axis=0)
-        # nor2 = np.concatenate((
-        #         (g1[:, -1, :] - g1[:, 0, :])[:, np.newaxis, :], 
-        #         -np.diff(g1, axis=1)
-        #         ), axis=1
-        #     ) + np.concatenate((
-        #         (g2[-1, :, :] - g2[0, :, :])[np.newaxis, :, :], 
-        #         -np.diff(g2, axis=0)
-        #         ), axis=0
-        #     )
         nor = lambda_ * nor1 + beta_ * fft2(nor2)
         den = lambda_ * den1 + beta_ * den2 + tau
         L1 = np.real(ifft2(nor / den))
@@ -81,12 +72,12 @@ def separate_layers(I, lambda_, beta_, i_max, eta_, lb, ub):
             
             for _ in range(100):
 
-                LB_t = L1[:, :, i]
+                LB_t = L1[:, :, i].copy()
                 threshold = 1 / np.prod(LB_t.shape)
                 dt_nor = np.sum(LB_t[LB_t < lb[:, :, i]])
                 dt = -2 * (dt_nor + np.sum(LB_t[LB_t > ub[:, :, i]])) / \
                     np.prod(LB_t.shape)
-                LB_t = LB_t + dt
+                LB_t += dt
                 
                 if np.abs(dt) < threshold:
                     break
@@ -147,7 +138,7 @@ def separate(img):
     
     return separate_layers(
         I = img,
-        lambda_ = 0,
+        lambda_ = 0.1,
         beta_ = 10,
         i_max = 5,
         eta_ = 2,
