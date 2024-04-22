@@ -1,5 +1,5 @@
 from load import load_ply
-from segmentation import find_plane
+from segment import find_plane
 from transform import reflect_points
 
 if __name__ == '__main__':
