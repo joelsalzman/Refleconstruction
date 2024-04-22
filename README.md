@@ -10,4 +10,4 @@ We use the Realsense and mirrors to try and get a better 3d reconstruction of ob
 
 |                 RGB Image                  |                  Depth Image                   |
 | :----------------------------------------: | :--------------------------------------------: |
-| ![RGB Image](data/parrot_test_5_Color.png) | ![Depth Image](data/parrot_test_5_D_Depth.png) |
+| ![RGB Image](media/parrot_test_5_Color.png) | ![Depth Image](media/parrot_test_5_D_Depth.png) |
