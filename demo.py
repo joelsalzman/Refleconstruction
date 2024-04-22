@@ -137,3 +137,9 @@ for key, point in points.items():
     create_mesh_from_box(
         original_obj, point, box_width, box_height, box_depth, f"Mesh_{key}"
     )
+
+obj_mesh = bpy.data.objects['Mesh_OBJ']
+    ref_mesh = bpy.data.objects['Mesh_REF']
+    mirror_normal = Vector((0,0,0)) - MIR
+
+    align_meshes(obj_mesh, ref_mesh, mirror_normal)
