@@ -1,3 +1,4 @@
+import numpy as np
 import bpy
 import bmesh
 import math
@@ -9,21 +10,43 @@ from mathutils import Matrix, Vector, Euler
 # NEED (X,Y,Z) COORDS OF THE REFLECTION
 # THE REALSENSE IS ABOVE THE GROUND SO WE NEED THE BOUNDING VOLUME TO GO DOWN A BIT AS WELL
 
-OBJ = (0, -0.08, -0.5)
-MIRR = (-0.51, 0, -0.76)
-REF = (-0.77, 0, -1.24)
+OBJ = Vector((0, -0.08, -0.5))
+MIRR = Vector((-0.51, 0, -0.76))
+REF = Vector((-0.77, 0, -1.24))
 
 box_width = 0.4  # x
 box_height = 1  # y
 box_depth = 0.4  # z
 
 points = {
-    "OBJ": Vector(OBJ),
-    "MIRR": Vector(MIRR),
-    "REF": Vector(REF),
+    "OBJ": OBJ,
+    "MIRR": MIRR,
+    "REF": REF,
 }
 
-FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/parrot_test_5.ply"
+FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/cup_test_1.ply"
+# FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/parrot_test_5.ply"
+
+
+#### UTIL FUNCTIONS TODO refactor these out ####
+def fit_plane_to_vertices(obj_name):
+    """Fits a plane to the vertices of the given mesh object and returns the plane normal."""
+    obj = bpy.data.objects[obj_name]
+    mesh = obj.data
+
+    coords = [obj.matrix_world @ v.co for v in mesh.vertices]
+    coords = np.array([[v.x, v.y, v.z] for v in coords])
+    centroid = np.mean(coords, axis=0)
+    coords_centered = coords - centroid
+
+    H = np.dot(coords_centered.T, coords_centered)
+    U, S, V = np.linalg.svd(H)
+
+    plane_normal = Vector(V[-1])
+    tangent1 = Vector(V[0])
+    tangent2 = Vector(V[1])
+
+    return plane_normal, tangent1, tangent2
 
 
 def clear_scene():
@@ -33,6 +56,58 @@ def clear_scene():
 
     for item in bpy.data.meshes:
         bpy.data.meshes.remove(item)
+
+
+def find_closest_vertices(obj_a, obj_b, height_axis="z", height_tolerance=0.1):
+    """
+    Find the closest vertices between two objects considering only vertices that are within a certain height tolerance.
+
+    Parameters:
+    - obj_a, obj_b: The mesh objects to compare.
+    - height_axis: The axis to use as height ('x', 'y', or 'z').
+    - height_tolerance: The maximum difference in height coordinates to consider vertices for comparison.
+    """
+    mesh_a = obj_a.data
+    mesh_b = obj_b.data
+
+    # I know that realsense loads in with y as default, but it feels wrong
+    axis_index = {"x": 0, "y": 1, "z": 2}.get(height_axis, 2)
+
+    min_distance = float("inf")
+    closest_pair = (None, None)
+
+    edge_a = {v for e in mesh_a.edges for v in e.vertices}
+    edge_b = {v for e in mesh_b.edges for v in e.vertices}
+
+    # We 'slice' both meshes TODO only compare edge vertices
+    for idx_a in edge_a:
+
+        vert_a = mesh_a.vertices[idx_a]
+        world_vert_a = obj_a.matrix_world @ vert_a.co
+
+        for idx_b in edge_b:
+            vert_b = mesh_b.vertices[idx_b]
+            world_vert_b = obj_b.matrix_world @ vert_b.co
+
+            if (
+                abs(world_vert_a[axis_index] - world_vert_b[axis_index])
+                <= height_tolerance
+            ):
+                distance = (world_vert_a - world_vert_b).length
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_pair = (world_vert_a, world_vert_b)
+    return closest_pair
+
+
+def calculate_translation(closest_vertices):
+    vert_a, vert_b = closest_vertices
+    # Calculate translation vector (from vert_b to vert_a)
+    translation_vector = vert_a - vert_b
+    return translation_vector
+
+
+#### UTIL FUNCTIONS TODO refactor these out ####
 
 
 def load_and_rotate_ply(filepath):
@@ -93,38 +168,97 @@ def create_mesh_from_box(base_mesh, center, width, height, depth, name):
     bpy.context.collection.objects.link(new_obj)
 
 
-def align_meshes(obj_mesh, ref_mesh, mirror_normal):
+def rotate_mesh_in_edit_mode(obj_name):
+    # Ensure the correct object is active and selected
+    bpy.ops.object.select_all(action="DESELECT")  # Deselect all objects
+    obj = bpy.data.objects[obj_name]  # Get the object by name
+    bpy.context.view_layer.objects.active = obj  # Make it the active object
+    obj.select_set(True)  # Select the object
+
+    # Toggle to Edit Mode
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    # Change shading to WIREFRAME to visually inspect the mesh during editing
+    # This is usually not necessary for the script to function but is useful for debugging
+    area = next(area for area in bpy.context.screen.areas if area.type == "VIEW_3D")
+    area.spaces[0].shading.type = "WIREFRAME"
+
+    # Select all geometry in the mesh
+    bpy.ops.mesh.select_all(action="SELECT")
+
+    # Apply rotation
+    bpy.ops.transform.rotate(
+        value=3.14159,  # Radians, equivalent to 180 degrees
+        orient_axis="Y",
+        orient_type="GLOBAL",
+        orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        orient_matrix_type="GLOBAL",
+        constraint_axis=(False, True, False),  # Constrain to Y-axis
+        use_proportional_edit=False,
+    )
+
+    # Toggle back to Object Mode
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def translate_using_mirror_in_edit_mode(obj_name, mirror_normal, mirror_point):
     """
-    Aligns the ref_mesh to the obj_mesh based on a mirror plane defined by mirror_normal.
+    Translates an object in edit mode so that it aligns with its reflection across a given mirror plane.
 
     Parameters:
-    - obj_mesh: The target mesh object (Blender object)
-    - ref_mesh: The reference mesh object to align (Blender object)
-    - mirror_normal: A Vector representing the normal to the mirror plane
+    - obj_name: Name of the object to translate.
+    - mirror_normal: A Vector representing the normal of the mirror plane.
+    - mirror_point: A Vector representing a point on the mirror plane.
     """
-    # Compute the required rotation
-    mirror_normal.normalize()
-    # the realsense reads out with y pointing up and z pointing forwards
-    up_vector = Vector((0, 1, 0))
+    # Ensure correct object is selected and active
+    bpy.ops.object.select_all(action="DESELECT")
+    obj = bpy.data.objects[obj_name]
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
 
-    # Calculate the rotation matrix 
-    rotation_axis = up_vector.cross(mirror_normal)
-    rotation_angle = up_vector.angle(mirror_normal)
-    rotation_matrix = Matrix.Rotation(rotation_angle, 4, rotation_axis)
+    # Switch to edit mode
+    bpy.ops.object.mode_set(mode="EDIT")
 
-    # Correcting for the plane reflection: rotate 180 degrees around the mirror normal
-    # Might need to invert here instead but not sure yet
-    reflection_matrix = Matrix.Rotation(math.pi, 4, mirror_normal)
+    # Load the mesh data into bmesh for edit
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.verts.ensure_lookup_table()
 
-    # Apply the computed rotation to the REF mesh
-    ref_mesh.matrix_world = (
-        Matrix.Translation(obj_mesh.location)  # Translate to OBJ mesh location
-        @ rotation_matrix  # Align with mirror normal
-        @ reflection_matrix  # Reflect across the mirror plane
-        @ Matrix.Translation(
-            -ref_mesh.location
-        )  # Translate center to origin for rotation
+    # Calculate the reflection matrix based on the mirror plane
+    d = -mirror_normal.dot(mirror_point)
+    reflection_matrix = Matrix(
+        [
+            [
+                1 - 2 * mirror_normal.x**2,
+                -2 * mirror_normal.x * mirror_normal.y,
+                -2 * mirror_normal.x * mirror_normal.z,
+            ],
+            [
+                -2 * mirror_normal.y * mirror_normal.x,
+                1 - 2 * mirror_normal.y**2,
+                -2 * mirror_normal.y * mirror_normal.z,
+            ],
+            [
+                -2 * mirror_normal.z * mirror_normal.x,
+                -2 * mirror_normal.z * mirror_normal.y,
+                1 - 2 * mirror_normal.z**2,
+            ],
+        ]
     )
+
+    # We use the center of the geometry for simplicity
+    center_of_geometry = sum((v.co for v in bm.verts), Vector()) / len(bm.verts)
+    reflected_position = reflection_matrix @ center_of_geometry + mirror_normal * (
+        2 * d
+    )
+    translation_vector = reflected_position - center_of_geometry
+
+    # Translate all vertices by the calculated vector
+    for v in bm.verts:
+        v.co += translation_vector
+
+    # Update the mesh and switch back to object mode
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.object.mode_set(mode="OBJECT")
 
 
 ### RUN
@@ -138,8 +272,14 @@ for key, point in points.items():
         original_obj, point, box_width, box_height, box_depth, f"Mesh_{key}"
     )
 
-obj_mesh = bpy.data.objects['Mesh_OBJ']
-    ref_mesh = bpy.data.objects['Mesh_REF']
-    mirror_normal = Vector((0,0,0)) - MIR
+obj_mesh = bpy.data.objects["Mesh_OBJ"]
+ref_mesh = bpy.data.objects["Mesh_REF"]
 
-    align_meshes(obj_mesh, ref_mesh, mirror_normal)
+mirror_normal = OBJ - MIRR
+
+# MAP ONTO
+# rotate_mesh_in_edit_mode("Mesh_REF")
+mirror, _, normal = fit_plane_to_vertices("Mesh_MIRR")
+mn = normal.normalized()
+print(mirror)
+translate_using_mirror_in_edit_mode("Mesh_REF", mirror_normal=mn, mirror_point=MIRR)

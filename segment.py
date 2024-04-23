@@ -25,7 +25,7 @@ def point_segmentation(points, mask) -> np.array:
     """
 
     # TODO: Nikolaus
-    pass
+    pass 
 
 def trimask(specular, diffuse):
     """

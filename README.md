@@ -30,6 +30,16 @@ We use blender for this step due to easy visualisation and python integration. A
 </div>
 
 ### 3. Transform and merge reflection onto object
+Since an object may have significant depth using a reflection transform to map the reflected mesh onto the position of the object mesh may not be correct. A simplifying assumption that we make is that if there are correspondences on both meshes, then logically these correspondences should be between the two closes vertices on each mesh. We therefore use blender commands to do these transforms instead of simply mirroring across the mirror plane.
 
+Working in blender py is nice because you can rip commands from the blender terminal instead of doing matrix maths yourself! The code below does mesh rotation around a local origin. To get these commands, one simply does the manipulation in the blender gui and then gains inspiration from the command outputs.
+
+<div style="width: 100%; text-align: center;">
+  <table style="margin: auto;">
+    <tr>
+      <td><img src="media/bpymath.png" alt="RGB Image" width="1000"/></td>
+    </tr>
+  </table>
+</div>
 
 ### 4. Map textures
