@@ -40,7 +40,8 @@ def save_mesh_as_obj(mesh_object, file_path):
     bpy.ops.object.select_all(action="DESELECT")
     mesh_object.select_set(True)
     bpy.context.view_layer.objects.active = mesh_object
-    bpy.ops.export_scene.obj(filepath=file_path, use_selection=True)
+    # bpy.ops.export_scene.obj(filepath=file_path, use_selection=True)
+    bpy.ops.wm.ply_export(filepath=file_path)
 
 
 def fit_plane_to_vertices(obj_name):
@@ -127,7 +128,8 @@ def calculate_translation(closest_vertices):
 def load_and_rotate_ply(filepath):
     clear_scene()
 
-    bpy.ops.import_mesh.ply(filepath=filepath)
+    # bpy.ops.import_mesh.ply(filepath=filepath)
+    bpy.ops.wm.ply_import(filepath=filepath)
 
     obj = bpy.context.selected_objects[0]
     obj.name = "Imported_PLY_Object"
