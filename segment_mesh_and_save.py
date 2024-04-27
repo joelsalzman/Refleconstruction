@@ -294,9 +294,9 @@ ref_mesh = bpy.data.objects["Mesh_REF"]
 mirr_mesh = bpy.data.objects["Mesh_MIRR"]
 
 
-save_mesh_as_obj(obj_mesh, "Mesh_OBJ.obj")
-save_mesh_as_obj(ref_mesh, "Mesh_REF.obj")
-save_mesh_as_obj(mirr_mesh, "Mesh_MIRR.obj")
+save_mesh_as_obj(obj_mesh, "Mesh_OBJ.ply")
+save_mesh_as_obj(ref_mesh, "Mesh_REF.ply")
+save_mesh_as_obj(mirr_mesh, "Mesh_MIRR.ply")
 
 mirror_normal = OBJ - MIRR
 
