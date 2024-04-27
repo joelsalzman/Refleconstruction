@@ -23,7 +23,8 @@ points = {
     "REF": Vector(REF),
 }
 
-FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/parrot_test_5.ply"
+# FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/parrot_test_5.ply"
+FILEPATH = r"data\parrot_test_5.ply"
 
 
 def clear_scene():
@@ -138,8 +139,8 @@ for key, point in points.items():
         original_obj, point, box_width, box_height, box_depth, f"Mesh_{key}"
     )
 
-obj_mesh = bpy.data.objects['Mesh_OBJ']
+    obj_mesh = bpy.data.objects['Mesh_OBJ']
     ref_mesh = bpy.data.objects['Mesh_REF']
-    mirror_normal = Vector((0,0,0)) - MIR
+    mirror_normal = Vector((0,0,0)) - MIRR
 
     align_meshes(obj_mesh, ref_mesh, mirror_normal)
