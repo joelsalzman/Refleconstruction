@@ -4,6 +4,8 @@ import bmesh
 import math
 from mathutils import Matrix, Vector, Euler
 
+# from transform import reflect_points
+
 # We can ignore z coords
 # NEED (X,Y,Z) COORDS OF CENTER OF OBJECT
 # NEED (X,Y,Z) COORDS OF MIRRORS
@@ -24,11 +26,23 @@ points = {
     "REF": REF,
 }
 
-FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/cup_test_1.ply"
-# FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/parrot_test_5.ply"
+# FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/cup_test_1.ply"
+FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/parrot_test_5.ply"
+
+bpy.ops.preferences.addon_enable(module="io_mesh_ply")
 
 
 #### UTIL FUNCTIONS TODO refactor these out ####
+def save_mesh_as_obj(mesh_object, file_path):
+    """
+    Saves the specified mesh object to an OBJ file at the given file path.
+    """
+    bpy.ops.object.select_all(action="DESELECT")
+    mesh_object.select_set(True)
+    bpy.context.view_layer.objects.active = mesh_object
+    bpy.ops.export_scene.obj(filepath=file_path, use_selection=True)
+
+
 def fit_plane_to_vertices(obj_name):
     """Fits a plane to the vertices of the given mesh object and returns the plane normal."""
     obj = bpy.data.objects[obj_name]
@@ -272,8 +286,15 @@ for key, point in points.items():
         original_obj, point, box_width, box_height, box_depth, f"Mesh_{key}"
     )
 
+
 obj_mesh = bpy.data.objects["Mesh_OBJ"]
 ref_mesh = bpy.data.objects["Mesh_REF"]
+mirr_mesh = bpy.data.objects["Mesh_MIRR"]
+
+
+save_mesh_as_obj(obj_mesh, "Mesh_OBJ.obj")
+save_mesh_as_obj(ref_mesh, "Mesh_REF.obj")
+save_mesh_as_obj(mirr_mesh, "Mesh_MIRR.obj")
 
 mirror_normal = OBJ - MIRR
 
@@ -282,4 +303,4 @@ mirror_normal = OBJ - MIRR
 mirror, _, normal = fit_plane_to_vertices("Mesh_MIRR")
 mn = normal.normalized()
 print(mirror)
-translate_using_mirror_in_edit_mode("Mesh_REF", mirror_normal=mn, mirror_point=MIRR)
+# translate_using_mirror_in_edit_mode("Mesh_REF", mirror_normal=mn, mirror_point=MIRR)
