@@ -1,11 +1,36 @@
 import cv2
 import os
 import torch
+import matplotlib.pyplot as plt
 
-def imshow(*args, **kwargs):
+def imshow(img):
 
-    for i, img in enumerate(args):
-        cv2.imshow(str(i), img, **kwargs)
+    if img.dtype == 'bool' and len(img.shape) == 3:
+        img = img.any(axis=2).astype(int)
+
+    plt.imshow(img)
+    
+def imshow_(image_array):
+    
+    fig = plt.figure(dpi=300)
+
+    # Calculate the figure size in inches based on the image dimensions and DPI
+    fig_width = 1280 / fig.dpi
+    fig_height = 480 / fig.dpi
+    fig.set_size_inches(fig_width, fig_height)
+    
+    # Display the image
+    plt.imshow(image_array)
+    
+    # Remove the axis
+    plt.axis("off")
+    
+    # Adjust the subplot parameters to minimize padding
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    
+    # Show the plot
+    plt.show()
+    
 
 def imwrite(*args, **kwargs):
 
@@ -16,6 +41,8 @@ def imwrite(*args, **kwargs):
 def to_ply(tensor, output_path):
 
     # Convert the PyTorch tensor to a numpy array
+    if tensor.device != 'cpu':
+        tensor = tensor.cpu()
     points = tensor.detach().numpy()
     
     # Get the number of points

@@ -1,6 +1,7 @@
 import bpy
 import bmesh
 import math
+import os
 from mathutils import Matrix, Vector, Euler
 
 # We can ignore z coords
@@ -10,7 +11,7 @@ from mathutils import Matrix, Vector, Euler
 # THE REALSENSE IS ABOVE THE GROUND SO WE NEED THE BOUNDING VOLUME TO GO DOWN A BIT AS WELL
 
 OBJ = (0, -0.08, -0.5)
-MIRR = (-0.51, 0, -0.76)
+MIR = (-0.51, 0, -0.76)
 REF = (-0.77, 0, -1.24)
 
 box_width = 0.4  # x
@@ -19,11 +20,12 @@ box_depth = 0.4  # z
 
 points = {
     "OBJ": Vector(OBJ),
-    "MIRR": Vector(MIRR),
+    "MIR": Vector(MIR),
     "REF": Vector(REF),
 }
 
 # FILEPATH = "/Users/nikh/Columbia/compimg_6732/CI-Project/data/parrot_test_5.ply"
+os.chdir(r'C:\Users\JOEL\OneDrive\Documents\Columbia\Spring_24\Computational_Imaging\CI-Project')
 FILEPATH = r"data\parrot_test_5.ply"
 
 
@@ -39,7 +41,8 @@ def clear_scene():
 def load_and_rotate_ply(filepath):
     clear_scene()
 
-    bpy.ops.import_mesh.ply(filepath=filepath)
+    # bpy.ops.import_mesh.ply(filepath=filepath)
+    bpy.ops.wm.ply_import(filepath=filepath)
 
     obj = bpy.context.selected_objects[0]
     obj.name = "Imported_PLY_Object"
@@ -141,6 +144,6 @@ for key, point in points.items():
 
     obj_mesh = bpy.data.objects['Mesh_OBJ']
     ref_mesh = bpy.data.objects['Mesh_REF']
-    mirror_normal = Vector((0,0,0)) - MIRR
+    mirror_normal = Vector((0,0,0)) - MIR
 
     align_meshes(obj_mesh, ref_mesh, mirror_normal)

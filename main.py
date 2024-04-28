@@ -5,6 +5,7 @@ from utils import to_ply
 # from transform import reflect_points
 from model import Reconstructor
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 
 # if __name__ == '__main__':
 
@@ -16,9 +17,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 if __name__ == '__main__':
 
-    model = Reconstructor()
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    model = Reconstructor().to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=1)
-    es = 3
+    es = 5
 
     dataloader = create_dataloader(r'data\segmented')
     torch.autograd.set_detect_anomaly(True)
@@ -33,10 +36,12 @@ if __name__ == '__main__':
         cloud = None
 
         model.set_direct(direct)
-        model.set_reflect(reflect)
+        model.initialize_by_centerpoint(reflect)
+        to_ply(model.reflect(reflect), r'data\outputs\parrot_flipped_initial.ply')
 
         normals = list()
-        for epoch in range(10):
+        losses = list()
+        for epoch in range(100):
 
             # Forward pass
             cloud = model(reflect)
@@ -44,6 +49,7 @@ if __name__ == '__main__':
             # Compute loss
             loss = model.loss(cloud)
             normal = model.normal.tolist()
+            losses.append(loss)
             normals.append(normal)
 
             # Logging
@@ -51,8 +57,12 @@ if __name__ == '__main__':
             print(f'Location: {normal[:3]}')
             print(f'Rotation: {normal[3:]}\n')
             # writer.add_graph(model, reflect)
-            if len(normals) > es and all([n == normal for n in normals[-es-1:-1]]):
-                break
+            if len(normals) > es:
+                if all([loss >= prev_loss for prev_loss in losses[-es-1:-1]]):
+                    model.set_normal(normals[np.argmin(np.array(losses[-es-1:-1]))])
+                    break
+                elif all([n == normal for n in normals[-es-1:-1]]):
+                    break
             
             # Backprop
             optimizer.zero_grad()
