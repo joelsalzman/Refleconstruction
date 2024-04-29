@@ -124,11 +124,12 @@ def compute_normal(match_points, depth, intrinsics):
 if __name__ == '__main__':
 
     filepath = r"data\bags\objectsbook.bag"
+    basename = os.path.basename(filepath).split('.')[0]
     
-    direct_mask = load_rgb(r'data\segmented\direct_mask.png'
-                           ).any(axis=2).astype('uint8')
-    reflect_mask = load_rgb(r'data\segmented\reflect_mask.png'
-                           ).any(axis=2).astype('uint8')
+    dpath = os.path.join('data', 'segmented', f'{basename}_direct_mask.png')
+    direct_mask = load_rgb(dpath).any(axis=2).astype('uint8')
+    rpath = os.path.join('data', 'segmented', f'{basename}_reflect_mask.png')
+    reflect_mask = load_rgb(rpath).any(axis=2).astype('uint8')
     
     img, depth, intrinsics = from_realsense(filepath)
 

@@ -14,7 +14,8 @@ from transformers import SamModel, SamProcessor
 from rgb_coords import get_point_from_image
 from segment_rgb import segment_with_sam
 from realsense import from_realsense, capture_frames
-from SAM import SAM_input, mask_to_points
+from transform import mask_to_points
+from SAM import SAM_input
 from load import load_rgb
 from SIFT import SIFT, compute_normal
 from run_model import run_model
@@ -41,14 +42,15 @@ if __name__ == '__main__':
     
     colorizer = rs.colorizer()
 
-    color = np.asanyarray(color_frame.get_data())
+    color = cv2.cvtColor(np.asanyarray(color_frame.get_data()), cv2.COLOR_BGR2RGB)
     colorized_depth = np.asanyarray(colorizer.colorize(depth_frame).get_data())
 
     images = np.hstack((color, colorized_depth))
     plt.imshow(images)
     plt.show()
     
-    obj_mask, mirr_mask, ref_mask = SAM_input(img, depth_frame, profile, output=True)
+    obj_mask, mirr_mask, ref_mask = SAM_input(
+        filepath, rs, profile, color_frame, depth_frame, test=False, output=True)
     
     # GET DEPTH DATA AT EACH POINT
     """
@@ -75,15 +77,18 @@ if __name__ == '__main__':
     # pcd = o3d.geometry.PointCloud()
     # pcd.points = o3d.utility.Vector3dVector(ref_point_cloud)
     
-    direct_mask = load_rgb(r'data\segmented\direct_mask.png'
-                           ).any(axis=2).astype('uint8')
-    reflect_mask = load_rgb(r'data\segmented\reflect_mask.png'
-                           ).any(axis=2).astype('uint8')
+    basename = os.path.basename(filepath).split('.')[0]
+    dpath = os.path.join('data', 'segmented', f'{basename}_direct_mask.png')
+    direct_mask = load_rgb(dpath).any(axis=2).astype('uint8')
+    rpath = os.path.join('data', 'segmented', f'{basename}_reflect_mask.png')
+    reflect_mask = load_rgb(rpath).any(axis=2).astype('uint8')
     
     img, depth, intrinsics = from_realsense(filepath)
 
     match_points = SIFT(img, direct_mask, reflect_mask, threshold=.5, seams=False)
 
     normal = compute_normal(match_points, depth, intrinsics)
+
+    # TODO: mask to xyz
 
     run_model(normal)
