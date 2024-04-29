@@ -26,7 +26,7 @@ def upsample_depth(rgb_depth_map, target_size):
     upsampled_rgb_depth_map = cv2.resize(rgb_depth_map, target_size[::-1], interpolation=cv2.INTER_CUBIC)
     return upsampled_rgb_depth_map
 
-def segment_with_sam(coords, filepath):
+def segment_with_sam_fp(coords, filepath):
     """Loads and segments using sam"""
     device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
@@ -43,6 +43,22 @@ def segment_with_sam(coords, filepath):
     
     # we want to keep the first mask
     return masks[0][0][0].numpy
+
+def segment_with_sam(model, processor, coords, image):
+    """Loads and segments using sam"""
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+
+    # model = SamModel.from_pretrained("facebook/sam-vit-base").to(device)
+    # processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
+    
+    inputs = processor(image, input_points=coords, return_tensors="pt").to(device)
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+    masks = processor.image_processor.post_process_masks(outputs.pred_masks.cpu(), inputs["original_sizes"].cpu(), inputs["reshaped_input_sizes"].cpu())
+    
+    # we want to keep the first mask
+    return masks
 
 def apply_mask_to_map(mask, rgb):
     """Use the mask to retrieve the corresponding rgb"""
@@ -71,4 +87,3 @@ def extract_mean_rgb(rgb_values):
 
     return mean_rgb
 
-def hue_to_depth(hue_image, )

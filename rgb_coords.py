@@ -35,9 +35,9 @@ def get_point_from_image_p(file_path):
 
     return points[0] if points else None
 
-def get_point_from_image(file_path):
+def get_point_from_image(img, msg='select object'):
     # Read the image using OpenCV
-    img = cv2.imread(file_path)
+    # img = cv2.imread(file_path)
 
     # Check if the image is loaded correctly
     if img is None:
@@ -49,7 +49,7 @@ def get_point_from_image(file_path):
 
     # Display the image
     plt.imshow(img_rgb)
-    plt.title("Click on the Image to Select a Point")
+    plt.title(msg)
     plt.axis("on")  # Show axes for reference
 
     # Use ginput to select points
@@ -69,5 +69,5 @@ def get_point_from_image(file_path):
     return points[0] if points else None
 
 # Example of how to use the function
-point = get_point_from_image("./data/parrot_test_5_Color.png")
-print("The coordinates of the selected point are:", point)
+# point = get_point_from_image("./data/parrot_test_5_Color.png")
+# print("The coordinates of the selected point are:", point)
