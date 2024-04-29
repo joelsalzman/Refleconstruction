@@ -3,7 +3,6 @@ import torch.nn as nn
 # import mathutils
 # from mathutils import Vector, Matrix
 from sklearn.neighbors import BallTree
-from load import create_dataloader
 from scipy.spatial import ConvexHull, distance
 import numpy as np
 
@@ -15,9 +14,10 @@ class Reconstructor(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         self.direct = None
-        self.normal = nn.Parameter(torch.randn(6, dtype=torch.float32).to(self.device))
+        self.apart = None
+        self.sixdof = nn.Parameter(torch.randn(6, dtype=torch.float32).to(self.device))
         
-        self.dist_weight = 0.00001
+        self.dist_weight = 0.1e-6
 
     def set_direct(self, direct):
         
@@ -26,9 +26,11 @@ class Reconstructor(nn.Module):
     def set_normal(self, normal):
 
         assert isinstance(normal, list)
-        self.normal.data = torch(normal).to(self.device)
+        self.sixdof.data = torch.tensor(normal).to(self.device)
+
 
     def initialize_by_centerpoint(self, cloud):
+        """this one doesnt work well at all"""
 
         assert self.direct is not None
         assert cloud.shape[1] == 3, cloud.shape
@@ -36,11 +38,11 @@ class Reconstructor(nn.Module):
         # We just find the vector between the centroids and use that
         direct_center = self.direct.mean(dim=0)
         reflect_center = cloud.to(self.device).mean(dim=0)
-        startpoint = (direct_center + reflect_center) / 1.8
+        startpoint = (direct_center + reflect_center) / 1.75
         orientation = direct_center - reflect_center
 
-        self.normal.data = torch.cat([startpoint, orientation])
-        assert self.normal.shape == (6,), self.normal.shape
+        self.sixdof.data = torch.cat([startpoint, orientation])
+        assert self.sixdof.shape == (6,), self.sixdof.shape
 
 
     def initialize_by_mirror(self, cloud):
@@ -49,7 +51,7 @@ class Reconstructor(nn.Module):
         centroid = torch.mean(cloud, axis=0)
         centered_points = cloud - centroid
 
-        # Need to be in numpy
+        # Need to have points in numpy
         if centered_points.device != 'cpu':
             centered_points = centered_points.cpu()
         points = centered_points.detach().numpy()
@@ -57,14 +59,14 @@ class Reconstructor(nn.Module):
         # Use SVD to find a plane to the points and find the plane normal
         _, _, vh = np.linalg.svd(points)
         normal = torch.from_numpy(vh[-1]).to(self.device)
-        self.normal = normal/torch.norm(normal) + centroid
+        self.sixdof = normal/torch.norm(normal) + centroid
 
 
     def reflect(self, points):
 
         # Extract the location and orientation components
-        location = self.normal[:3]
-        orientation = self.normal[3:]
+        location = self.sixdof[:3]
+        orientation = self.sixdof[3:]
 
         # Normalize the orientation vector
         orientation = (orientation / torch.norm(orientation)).view(1, 3)
@@ -117,22 +119,21 @@ class Reconstructor(nn.Module):
 
         # Declare arrays for storing curvature values
         gaussian_curvatures = torch.zeros(n)
-        mask = torch.zeros(n, dtype=torch.bool)
         
         # See if the point clouds are close
-        for i in range(n):
+        mask = torch.tensor([
+                ~(torch.all(indices[i] < m) | torch.all(indices[i] >= m))
+                for i in range(n)
+            ], dtype=torch.bool
+        )
 
-            # Only care about the points close to the other point cloud
-            if torch.all(indices[i] < m) | torch.all(indices[i] >= m):
-                continue
-            mask[i] = True
-
-        # If the point clouds are too far apart, we should look at every point
+        # If the point clouds are too far apart, no need to waste time computing
         if not torch.any(mask):
             print('Clouds far apart')
-            return torch.tensor([1]).to(self.device)
-        else:
-            print(f'Analyzing {mask.sum()}/{mask.shape[0]} nearby points')
+            self.apart = 1
+            return
+        print(f'Analyzing {mask.sum()}/{mask.shape[0]} nearby points')
+        self.apart = -1
 
         # Iterate through useful points
         for i in torch.argwhere(mask):
@@ -152,42 +153,55 @@ class Reconstructor(nn.Module):
             # Compute the Gaussian curvature
             gaussian_curvatures[i] = torch.prod(eigenvalues) / (torch.sum(eigenvalues)**2 + 1e-6)
         
-        return torch.mean(gaussian_curvatures[mask], dtype=torch.float32)
+        squared_curvatures = torch.pow(gaussian_curvatures, 2)
+        return torch.mean(squared_curvatures[mask], dtype=torch.float32) * 1e10
     
-    def neighbor_mse(self, cloud, k, distances, indices):
+  
+    def convex_hull(self, cloud):
 
-        # Gather the neighboring points
-        neighbors = cloud[indices]
-        
-        # Repeat the points tensor to match the shape of neighbors
-        repeated_points = cloud.unsqueeze(1).repeat(1, k+1, 1)
-        
-        # Compute the squared differences between points and their neighbors
-        squared_diffs = torch.pow(repeated_points - neighbors, 2)
-        
-        # Compute the mean squared error loss
-        mse_loss = torch.mean(squared_diffs, dtype=torch.float32)
-        return mse_loss
-    
-    # def hull_distance(self, cloud):
+        pass
 
-    #     reflect = cloud[self.direct.shape[0]:]
-        
-    #     d_hull = ConvexHull(self.direct.detach().numpy())
-    #     r_hull = ConvexHull(reflect.detach().numpy())
 
-    #     return distance.cdist()
+    def chamfer_distance(self, p1, p2, distances):
+
+        # Get the number of points in each point cloud
+        n = p1.shape[0]
+        m = p2.shape[0]
+
+        # Extract the closest distances and indices for each point
+        dist_sq, indices = distances[:, 0], distances[:, 1].long()
+
+        # Reshape the distances and indices to match the point cloud shapes
+        dist_sq_p1_to_p2 = dist_sq[:n].view(n, 1)
+        dist_sq_p2_to_p1 = dist_sq[n:].view(m, 1)
+        indices_p1_to_p2 = indices[:n].view(n, 1)
+        indices_p2_to_p1 = indices[n:].view(m, 1)
+
+        # Gather the corresponding points from p2 for each point in p1
+        nearest_points_p1_to_p2 = torch.gather(p2, 0, indices_p1_to_p2.expand(-1, p2.shape[1]))
+
+        # Gather the corresponding points from p1 for each point in p2
+        nearest_points_p2_to_p1 = torch.gather(p1, 0, indices_p2_to_p1.expand(-1, p1.shape[1]))
+
+        # Compute the squared distances between the nearest points
+        dist_sq_p1_to_p2 = torch.sum((p1 - nearest_points_p1_to_p2) ** 2, dim=1, keepdim=True)
+        dist_sq_p2_to_p1 = torch.sum((p2 - nearest_points_p2_to_p1) ** 2, dim=1, keepdim=True)
+
+        # Compute the Chamfer distance
+        chamfer_dist = self.apart * torch.mean(dist_sq_p1_to_p2) + torch.mean(dist_sq_p2_to_p1)
+
+        return chamfer_dist
         
     def loss(self, cloud, k=10):
 
         distances, indices = self.knn(cloud, k)
 
         curve_loss = self.gaussian_curvature(cloud, k, distances, indices)
-        dist_loss = self.neighbor_mse(cloud, k, distances, indices)
+        dist_loss = self.chamfer_distance(self.direct, cloud[self.direct.shape[0]:], distances)
 
-        loss = (self.dist_weight * dist_loss) + ((1 - self.dist_weight) * curve_loss)
+        if curve_loss is not None:
+            loss = (self.dist_weight * dist_loss) + ((1 - self.dist_weight) * curve_loss)
+        else:
+            loss = dist_loss
+
         return loss
-    
-    @torch.no_grad()
-    def test(self, cloud):
-        return self(cloud)
