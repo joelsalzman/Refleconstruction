@@ -57,8 +57,8 @@ def segment_point_clouds(
 
     print("saving point clouds individually")
 
-    o3d.io.write_point_cloud(os.path.join('data', 'segmented', f"{basename}_mirror.ply"), mirror_pcd)
     o3d.io.write_point_cloud(os.path.join('data', 'segmented', f"{basename}_direct.ply"), obj_pcd)
+    o3d.io.write_point_cloud(os.path.join('data', 'segmented', f"{basename}_mirror.ply"), mirror_pcd)
     o3d.io.write_point_cloud(os.path.join('data', 'segmented', f"{basename}_reflect.ply"), ref_pcd)
 
     o3d.visualization.draw_geometries(

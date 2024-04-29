@@ -15,7 +15,7 @@ def load_rgb(file_path):
 
     img = cv2.imread(file_path)
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
+
 
 class PLYDataset(torch.utils.data.Dataset):
 
@@ -61,14 +61,16 @@ class PLYDataset(torch.utils.data.Dataset):
             pcd = o3d.io.read_point_cloud(file_group['mirror'])
             mirror_points = np.asarray(pcd.points)
 
-        return direct_points, reflect_points, mirror_points
+        return key, direct_points, reflect_points, mirror_points
 
 def collate_fn(batch):
+    keys = []
     direct_points_list = []
     reflect_points_list = []
     mirror_points_list = []
 
-    for direct_points, reflect_points, mirror_points in batch:
+    for key, direct_points, reflect_points, mirror_points in batch:
+        keys.append(key)
         if direct_points is not None:
             direct_points_list.append(direct_points)
         if reflect_points is not None:
@@ -77,6 +79,7 @@ def collate_fn(batch):
             mirror_points_list.append(mirror_points)
 
     collated_batch = {}
+    collated_batch['name'] = keys
 
     if direct_points_list:
         num_points_list = [len(points) for points in direct_points_list]

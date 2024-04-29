@@ -17,7 +17,7 @@ class Reconstructor(nn.Module):
         self.apart = None
         self.sixdof = nn.Parameter(torch.randn(6, dtype=torch.float32).to(self.device))
         
-        self.dist_weight = 0.1e-2
+        self.dist_weight = 0.1
 
     def set_direct(self, direct):
         
@@ -25,7 +25,8 @@ class Reconstructor(nn.Module):
 
     def set_normal(self, normal):
 
-        assert isinstance(normal, list)
+        if not isinstance(normal, list):
+            normal = normal.tolist()
         self.sixdof.data = torch.tensor(normal).to(self.device)
 
 

@@ -14,12 +14,12 @@ import os
 #     points = reflect_points(point_cloud, plane_normal)
 
 
-def run_model(basename, sixdof=None):
+def run_model(basename=None, sixdof=None):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     model = Reconstructor().to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=.001)
     es = 25
 
     dataloader = create_dataloader(r'data\segmented')
@@ -31,13 +31,19 @@ def run_model(basename, sixdof=None):
 
         direct = batch['direct_points']
         reflected = batch['reflect_points']
-        mirror = batch['mirror_points']
+        mirror = batch['mirror_points'] if 'mirror_points' in batch else None
+        
+        if basename is not None and batch['name'][0] != basename:
+            print(f"Skipping {basename}")
+            continue
+        basename = batch['name']
+
         cloud = None
 
         model.set_direct(direct)
         
         if sixdof is not None:
-            model.set_normal(sixdof.tolist())
+            model.set_normal(sixdof)
         elif mirror is not None:
             model.initialize_by_mirror(mirror)
         else:
@@ -70,7 +76,8 @@ def run_model(basename, sixdof=None):
                     nearby = losses[-es-1:-1]
                     if device != 'cpu':
                         nearby = [f.cpu() for f in nearby]
-                    model.set_normal(sixdofs[np.argmin([f.detach().numpy() for f in nearby])])
+                    sixdof = sixdofs[np.argmin([f.detach().numpy() for f in nearby])]
+                    model.set_normal(sixdof)
                     break
                 elif all([n == sixdof for n in sixdofs[-es-1:-1]]):
                     break
@@ -78,8 +85,8 @@ def run_model(basename, sixdof=None):
             # Backprop
             optimizer.zero_grad()
             loss.backward()
-            if epoch % 2: # this is to prioritize rotation
-                model.sixdof.grad[:3] = 0
+            # if epoch % 2: # this is to prioritize rotation
+            #     model.sixdof.grad[:3] = 0
             optimizer.step()
 
         # torch_to_blender(cloud)
@@ -87,5 +94,7 @@ def run_model(basename, sixdof=None):
             'data', 'outputs', f'{basename}_flipped_final.ply')
         )
 
+    return model
+
 if __name__ == '__main__':
-    run_model('doorknob')
+    run_model('cvbook')

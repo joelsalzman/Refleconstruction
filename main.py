@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # filepath_color = "./data/parrot_test_5_Color.png"
     # segment_and_depth(filepath_color)
 
-    filepath = r"data\bags\trinkets.bag"
+    filepath = r"data\bags\cvbook.bag"
     name = os.path.basename(filepath)
 
     # TODO: these do very similar things
@@ -66,4 +66,4 @@ if __name__ == '__main__':
 
     segment_point_clouds(basename, rs, profile, depth_frame, color_frame, obj_mask, mirr_mask, ref_mask)
 
-    run_model(basename, normal)
+    model = run_model(sixdof=normal)
