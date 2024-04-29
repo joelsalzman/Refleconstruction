@@ -44,11 +44,8 @@ def get_point_from_image(img, msg='select object'):
         print("Failed to load image")
         return
 
-    # Convert the image from BGR to RGB
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
     # Display the image
-    plt.imshow(img_rgb)
+    plt.imshow(img)
     plt.title(msg)
     plt.axis("on")  # Show axes for reference
 

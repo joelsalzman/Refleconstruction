@@ -17,7 +17,7 @@ class Reconstructor(nn.Module):
         self.apart = None
         self.sixdof = nn.Parameter(torch.randn(6, dtype=torch.float32).to(self.device))
         
-        self.dist_weight = 0.1e-6
+        self.dist_weight = 0.1e-2
 
     def set_direct(self, direct):
         
@@ -59,7 +59,8 @@ class Reconstructor(nn.Module):
         # Use SVD to find a plane to the points and find the plane normal
         _, _, vh = np.linalg.svd(points)
         normal = torch.from_numpy(vh[-1]).to(self.device)
-        self.sixdof = normal/torch.norm(normal) + centroid
+        self.sixdof.data = torch.cat([normal/torch.norm(normal), centroid])
+        assert self.sixdof.data.shape == (6,)
 
 
     def reflect(self, points):
@@ -130,10 +131,10 @@ class Reconstructor(nn.Module):
         # If the point clouds are too far apart, no need to waste time computing
         if not torch.any(mask):
             print('Clouds far apart')
-            self.apart = 1
+            # self.apart = 1
             return
         print(f'Analyzing {mask.sum()}/{mask.shape[0]} nearby points')
-        self.apart = -1
+        # self.apart = -1
 
         # Iterate through useful points
         for i in torch.argwhere(mask):
@@ -162,34 +163,29 @@ class Reconstructor(nn.Module):
         pass
 
 
-    def chamfer_distance(self, p1, p2, distances):
-
-        # Get the number of points in each point cloud
-        n = p1.shape[0]
-        m = p2.shape[0]
-
-        # Extract the closest distances and indices for each point
-        dist_sq, indices = distances[:, 0], distances[:, 1].long()
-
-        # Reshape the distances and indices to match the point cloud shapes
-        dist_sq_p1_to_p2 = dist_sq[:n].view(n, 1)
-        dist_sq_p2_to_p1 = dist_sq[n:].view(m, 1)
-        indices_p1_to_p2 = indices[:n].view(n, 1)
-        indices_p2_to_p1 = indices[n:].view(m, 1)
-
-        # Gather the corresponding points from p2 for each point in p1
-        nearest_points_p1_to_p2 = torch.gather(p2, 0, indices_p1_to_p2.expand(-1, p2.shape[1]))
-
-        # Gather the corresponding points from p1 for each point in p2
-        nearest_points_p2_to_p1 = torch.gather(p1, 0, indices_p2_to_p1.expand(-1, p1.shape[1]))
-
-        # Compute the squared distances between the nearest points
-        dist_sq_p1_to_p2 = torch.sum((p1 - nearest_points_p1_to_p2) ** 2, dim=1, keepdim=True)
-        dist_sq_p2_to_p1 = torch.sum((p2 - nearest_points_p2_to_p1) ** 2, dim=1, keepdim=True)
-
+    def chamfer_distance(self, p1, p2):
+        """
+        Compute the Chamfer distance between two point clouds.
+        
+        Args:
+            p1 (torch.Tensor): First point cloud, shape (N, D)
+            p2 (torch.Tensor): Second point cloud, shape (M, D)
+        
+        Returns:
+            torch.Tensor: Chamfer distance between p1 and p2
+        """
+        # Compute pairwise distances between points in p1 and p2
+        distances = torch.cdist(p1, p2)
+        
+        # Find the minimum distance for each point in p1 to p2
+        min_dist_p1_to_p2, _ = torch.min(distances, dim=1)
+        
+        # Find the minimum distance for each point in p2 to p1
+        min_dist_p2_to_p1, _ = torch.min(distances, dim=0)
+        
         # Compute the Chamfer distance
-        chamfer_dist = self.apart * torch.mean(dist_sq_p1_to_p2) + torch.mean(dist_sq_p2_to_p1)
-
+        chamfer_dist = torch.mean(min_dist_p1_to_p2) + torch.mean(min_dist_p2_to_p1)
+        
         return chamfer_dist
         
     def loss(self, cloud, k=10):
@@ -197,7 +193,7 @@ class Reconstructor(nn.Module):
         distances, indices = self.knn(cloud, k)
 
         curve_loss = self.gaussian_curvature(cloud, k, distances, indices)
-        dist_loss = self.chamfer_distance(self.direct, cloud[self.direct.shape[0]:], distances)
+        dist_loss = self.chamfer_distance(self.direct, cloud[self.direct.shape[0]:])
 
         if curve_loss is not None:
             loss = (self.dist_weight * dist_loss) + ((1 - self.dist_weight) * curve_loss)

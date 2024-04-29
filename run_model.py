@@ -1,11 +1,10 @@
 import torch
 from load import create_dataloader
 from utils import to_ply
-# from segment import find_plane
-# from transform import reflect_points
 from model import Reconstructor
 # from torch.utils.tensorboard import SummaryWriter
 import numpy as np
+import os
 
 # if __name__ == '__main__':
 
@@ -15,13 +14,13 @@ import numpy as np
 #     points = reflect_points(point_cloud, plane_normal)
 
 
-def run_model(normal=None):
+def run_model(basename, sixdof=None):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     model = Reconstructor().to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=1)
-    es = 5
+    optimizer = torch.optim.SGD(model.parameters(), lr=.001)
+    es = 10
 
     dataloader = create_dataloader(r'data\segmented')
     torch.autograd.set_detect_anomaly(True)
@@ -37,38 +36,43 @@ def run_model(normal=None):
 
         model.set_direct(direct)
         
-        if normal is not None:
-            model.set_normal(normal.tolist())
+        if sixdof is not None:
+            model.set_normal(sixdof.tolist())
         elif mirror is not None:
-            model.initialize_from_mirror(mirror)
+            model.initialize_by_mirror(mirror)
         else:
-            model.initialize_from_centerpoint(reflected)
+            model.initialize_by_centerpoint(reflected)
 
-        to_ply(model.reflect(reflected), r'data\outputs\parrot_flipped_initial.ply')
+        to_ply(model.reflect(reflected), os.path.join(
+            'data', 'outputs', f'{basename}_flipped_initial.ply')
+        )
 
-        normals = list()
+        sixdofs = list()
         losses = list()
-        for epoch in range(100):
+        for epoch in range(10000):
 
             # Forward pass
             cloud = model(reflected)
             
             # Compute loss
             loss = model.loss(cloud)
-            normal = model.normal.tolist()
+            sixdof = model.sixdof.tolist()
             losses.append(loss)
-            normals.append(normal)
+            sixdofs.append(sixdof)
 
             # Logging
             print(f'Epoch {epoch} Loss: {loss}')
-            print(f'Location: {normal[:3]}')
-            print(f'Rotation: {normal[3:]}\n')
+            print(f'Location: {sixdof[:3]}')
+            print(f'Rotation: {sixdof[3:]}\n')
             # writer.add_graph(model, reflect)
-            if len(normals) > es:
+            if len(sixdofs) > es:
                 if all([loss >= prev_loss for prev_loss in losses[-es-1:-1]]):
-                    model.set_normal(normals[np.argmin(np.array(losses[-es-1:-1]))])
+                    nearby = losses[-es-1:-1]
+                    if device != 'cpu':
+                        nearby = [f.cpu() for f in nearby]
+                    model.set_normal(sixdofs[np.argmin([f.detach().numpy() for f in nearby])])
                     break
-                elif all([n == normal for n in normals[-es-1:-1]]):
+                elif all([n == sixdof for n in sixdofs[-es-1:-1]]):
                     break
             
             # Backprop
@@ -77,7 +81,9 @@ def run_model(normal=None):
             optimizer.step()
 
         # torch_to_blender(cloud)
-        to_ply(model.reflect(reflected), r'data\outputs\parrot_flipped.ply')
+        to_ply(model.reflect(reflected), os.path.join(
+            'data', 'outputs', f'{basename}_flipped.ply')
+        )
 
 if __name__ == '__main__':
-    run_model()
+    run_model('tums')

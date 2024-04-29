@@ -42,7 +42,7 @@ if __name__ == '__main__':
     
     colorizer = rs.colorizer()
 
-    color = cv2.cvtColor(np.asanyarray(color_frame.get_data()), cv2.COLOR_BGR2RGB)
+    color = np.asanyarray(color_frame.get_data())
     colorized_depth = np.asanyarray(colorizer.colorize(depth_frame).get_data())
 
     images = np.hstack((color, colorized_depth))
@@ -66,4 +66,4 @@ if __name__ == '__main__':
 
     segment_point_clouds(basename, rs, profile, depth_frame, color_frame, obj_mask, mirr_mask, ref_mask)
 
-    run_model(normal)
+    run_model(basename, normal)

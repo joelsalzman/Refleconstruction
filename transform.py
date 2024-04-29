@@ -1,8 +1,9 @@
 import numpy as np
 import open3d as o3d
 import os
+import cv2
 
-def mask_to_points(mask, vertices, tex_coords, color_image, ):
+def mask_to_points(mask, vertices, tex_coords, color_image):
 
     filtered_indices = np.where(mask.flatten())[
         0
@@ -42,6 +43,7 @@ def segment_point_clouds(
 
     pc = rs.pointcloud()
     pc.map_to(color_frame)
+    color_image = cv2.cvtColor(np.asanyarray(color_frame.get_data()), cv2.COLOR_BGR2RGB)
     points = pc.calculate(depth_frame)
 
     vertices = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
@@ -49,15 +51,15 @@ def segment_point_clouds(
         np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2)
     )
 
-    mirror_pcd = mask_to_points(mirr_mask, vertices, tex_coords)
-    obj_pcd = mask_to_points(obj_mask, vertices, tex_coords)
-    ref_pcd = mask_to_points(ref_mask, vertices, tex_coords)
+    mirror_pcd = mask_to_points(mirr_mask, vertices, tex_coords, color_image)
+    obj_pcd = mask_to_points(obj_mask, vertices, tex_coords, color_image)
+    ref_pcd = mask_to_points(ref_mask, vertices, tex_coords, color_image)
 
     print("saving point clouds individually")
 
-    o3d.io.write_point_cloud(os.path.join('data', 'outputs', f"{basename}_mirror.ply"), mirror_pcd)
-    o3d.io.write_point_cloud(os.path.join('data', 'outputs', f"{basename}_direct.ply"), obj_pcd)
-    o3d.io.write_point_cloud(os.path.join('data', 'outputs', f"{basename}_reflect.ply"), ref_pcd)
+    o3d.io.write_point_cloud(os.path.join('data', 'segmented', f"{basename}_mirror.ply"), mirror_pcd)
+    o3d.io.write_point_cloud(os.path.join('data', 'segmented', f"{basename}_direct.ply"), obj_pcd)
+    o3d.io.write_point_cloud(os.path.join('data', 'segmented', f"{basename}_reflect.ply"), ref_pcd)
 
     o3d.visualization.draw_geometries(
         [mirror_pcd, obj_pcd, ref_pcd],

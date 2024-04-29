@@ -16,7 +16,7 @@ def SAM_input(filepath, rs, profile, color_frame, depth_frame, test=False, outpu
 
     colorizer = rs.colorizer()
 
-    color_image = cv2.cvtColor(np.asanyarray(color_frame.get_data()), cv2.COLOR_BGR2RGB)
+    color_image = np.asanyarray(color_frame.get_data())
     
     colorized_depth = np.asanyarray(colorizer.colorize(depth_frame).get_data())
 
