@@ -20,7 +20,7 @@ def run_model(basename, sixdof=None):
 
     model = Reconstructor().to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=.001)
-    es = 10
+    es = 25
 
     dataloader = create_dataloader(r'data\segmented')
     torch.autograd.set_detect_anomaly(True)
@@ -78,12 +78,14 @@ def run_model(basename, sixdof=None):
             # Backprop
             optimizer.zero_grad()
             loss.backward()
+            if epoch % 2: # this is to prioritize rotation
+                model.sixdof.grad[:3] = 0
             optimizer.step()
 
         # torch_to_blender(cloud)
         to_ply(model.reflect(reflected), os.path.join(
-            'data', 'outputs', f'{basename}_flipped.ply')
+            'data', 'outputs', f'{basename}_flipped_final.ply')
         )
 
 if __name__ == '__main__':
-    run_model('tums')
+    run_model('doorknob')
