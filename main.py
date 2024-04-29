@@ -14,7 +14,7 @@ from transformers import SamModel, SamProcessor
 from rgb_coords import get_point_from_image
 from segment_rgb import segment_with_sam
 from realsense import from_realsense, capture_frames
-from transform import mask_to_points
+from transform import mask_to_points, segment_point_clouds
 from SAM import SAM_input
 from load import load_rgb
 from SIFT import SIFT, compute_normal
@@ -52,31 +52,6 @@ if __name__ == '__main__':
     obj_mask, mirr_mask, ref_mask = SAM_input(
         filepath, rs, profile, color_frame, depth_frame, test=False, output=True)
     
-    # GET DEPTH DATA AT EACH POINT
-    """
-    1. overlay the mask on the depth map
-    2. at each pixel where the depth map is non 0 copy rgb d to new img array
-    3. save
-    """
-    # depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
-    
-    # mirror_point_cloud = mask_to_points(mirr_mask, depth_frame, 
-    #                                     depth_profile.get_intrinsics())
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = o3d.utility.Vector3dVector(mirror_point_cloud)
-    # o3d.io.write_point_cloud('mirror_point_cloud.ply', pcd)
-    
-    # object_point_cloud = mask_to_points(obj_mask, depth_frame, 
-    #                                     depth_profile.get_intrinsics())
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = o3d.utility.Vector3dVector(object_point_cloud)
-    # o3d.io.write_point_cloud('object_point_cloud.ply', pcd)
-    
-    # ref_point_cloud = mask_to_points(ref_mask, depth_frame, 
-    #                                  depth_profile.get_intrinsics())
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = o3d.utility.Vector3dVector(ref_point_cloud)
-    
     basename = os.path.basename(filepath).split('.')[0]
     dpath = os.path.join('data', 'segmented', f'{basename}_direct_mask.png')
     direct_mask = load_rgb(dpath).any(axis=2).astype('uint8')
@@ -89,6 +64,6 @@ if __name__ == '__main__':
 
     normal = compute_normal(match_points, depth, intrinsics)
 
-    # TODO: mask to xyz
+    segment_point_clouds(basename, rs, profile, depth_frame, color_frame, obj_mask, mirr_mask, ref_mask)
 
     run_model(normal)

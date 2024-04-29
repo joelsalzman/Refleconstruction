@@ -33,8 +33,8 @@ class PLYDataset(torch.utils.data.Dataset):
                     file_groups[key]['direct'] = os.path.join(self.root_dir, file)
                 elif '_reflect.ply' in file:
                     file_groups[key]['reflect'] = os.path.join(self.root_dir, file)
-                elif '_tv.ply' in file:
-                    file_groups[key]['tv'] = os.path.join(self.root_dir, file)
+                elif '_mirror.ply' in file:
+                    file_groups[key]['mirror'] = os.path.join(self.root_dir, file)
         return file_groups
 
     def __len__(self):
@@ -46,7 +46,7 @@ class PLYDataset(torch.utils.data.Dataset):
 
         direct_points = None
         reflect_points = None
-        tv_points = None
+        mirror_points = None
 
         if 'direct' in file_group:
             pcd = o3d.io.read_point_cloud(file_group['direct'])
@@ -56,24 +56,24 @@ class PLYDataset(torch.utils.data.Dataset):
             pcd = o3d.io.read_point_cloud(file_group['reflect'])
             reflect_points = np.asarray(pcd.points)
 
-        if 'tv' in file_group:
-            pcd = o3d.io.read_point_cloud(file_group['tv'])
-            tv_points = np.asarray(pcd.points)
+        if 'mirror' in file_group:
+            pcd = o3d.io.read_point_cloud(file_group['mirror'])
+            mirror_points = np.asarray(pcd.points)
 
-        return direct_points, reflect_points, tv_points
+        return direct_points, reflect_points, mirror_points
 
 def collate_fn(batch):
     direct_points_list = []
     reflect_points_list = []
-    tv_points_list = []
+    mirror_points_list = []
 
-    for direct_points, reflect_points, tv_points in batch:
+    for direct_points, reflect_points, mirror_points in batch:
         if direct_points is not None:
             direct_points_list.append(direct_points)
         if reflect_points is not None:
             reflect_points_list.append(reflect_points)
-        if tv_points is not None:
-            tv_points_list.append(tv_points)
+        if mirror_points is not None:
+            mirror_points_list.append(mirror_points)
 
     collated_batch = {}
 
@@ -99,16 +99,16 @@ def collate_fn(batch):
         collated_batch['reflect_points'] = torch.from_numpy(np.stack(padded_points, axis=0)).float().squeeze()
         collated_batch['reflect_num_points'] = torch.tensor(num_points_list, dtype=torch.long).squeeze()
 
-    if tv_points_list:
-        num_points_list = [len(points) for points in tv_points_list]
+    if mirror_points_list:
+        num_points_list = [len(points) for points in mirror_points_list]
         max_points = max(num_points_list)
         padded_points = []
-        for points in tv_points_list:
+        for points in mirror_points_list:
             pad_size = max_points - len(points)
             padded = np.pad(points, ((0, pad_size), (0, 0)), mode='constant', constant_values=0)
             padded_points.append(padded)
-        collated_batch['tv_points'] = torch.from_numpy(np.stack(padded_points, axis=0)).float().squeeze()
-        collated_batch['tv_num_points'] = torch.tensor(num_points_list, dtype=torch.long).squeeze()
+        collated_batch['mirror_points'] = torch.from_numpy(np.stack(padded_points, axis=0)).float().squeeze()
+        collated_batch['mirror_num_points'] = torch.tensor(num_points_list, dtype=torch.long).squeeze()
 
     return collated_batch
 

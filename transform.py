@@ -1,75 +1,6 @@
 import numpy as np
-# import bpy
-# import bmesh
-# import mathutils
-# from mathutils import Vector, Matrix
-from sklearn.neighbors import NearestNeighbors
 import open3d as o3d
-
-# def reflect_points(points, plane_normal):
-#     """
-#     Inputs are the point cloud and the plane they'll be reflected over.
-#     Output is a point cloud.
-#     """
-#     # Normalize the plane normal
-#     plane_normal.normalize()
-    
-#     # Convert points to a list of mathutils.Vector
-#     points = [mathutils.Vector(point) for point in points]
-    
-#     # Reflect points
-#     reflected_points = []
-#     for point in points:
-#         projection = point.dot(plane_normal)
-#         reflected_point = point - 2 * projection * plane_normal
-#         reflected_points.append(reflected_point)
-    
-#     return reflected_points
-
-# def find_plane_candidates(bm):
-    
-#     obj = bpy.context.active_object
-    
-#     # Generate the convex hull
-#     bmesh.ops.convex_hull(bm, input=bm.verts)
-    
-#     # Update the mesh with the bmesh changes
-#     bm.to_mesh(obj.data)
-#     bm.free()
-    
-#     # Switch back to object mode
-#     bpy.ops.object.mode_set(mode='OBJECT')
-    
-#     # Output the plane normals for every face in the convex hull
-#     mesh = obj.data
-#     normals = [poly.normal for poly in mesh.polygons]
-    
-#     return normals
-
-# def _flip_merge(r1, r2, direct, r1_n, r2_n, i):
-
-#     f1 = reflect_points(r1, r1_n)
-#     f2 = reflect_points(r2, r2_n)
-
-#     merged_mesh = bpy.data.meshes.new(name=f"Candidate {i}")
-#     merged_obj = bpy.data.objects.new(f"Candidate {i}", merged_mesh)
-#     bpy.context.scene.collection.objects.link(merged_obj)  
-#     bm = bmesh.new()
-
-#     for obj in [f1, f2, direct]:
-#         if obj.type == 'MESH':
-#             mesh = obj.data
-#             for vert in mesh.vertices:
-#                 bm.verts.new(vert.co)
-
-#     # Update the merged mesh with the bmesh
-#     bm.to_mesh(merged_mesh)
-#     bm.free()
-
-#     # Update the scene
-#     bpy.context.view_layer.update()
-
-#     return merged_mesh
+import os
 
 def mask_to_points(mask, vertices, tex_coords, color_image, ):
 
@@ -99,3 +30,40 @@ def mask_to_points(mask, vertices, tex_coords, color_image, ):
     pcd.colors = o3d.utility.Vector3dVector(colors / 255.0)  # Normalize colors
 
     return pcd
+
+def segment_point_clouds(
+    basename, rs, profile, depth_frame, color_frame, obj_mask, mirr_mask, ref_mask):
+
+    depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
+
+    intrinsics = depth_profile.get_intrinsics()
+
+    depth_image = np.asanyarray(depth_frame.get_data())
+
+    pc = rs.pointcloud()
+    pc.map_to(color_frame)
+    points = pc.calculate(depth_frame)
+
+    vertices = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
+    tex_coords = (
+        np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2)
+    )
+
+    mirror_pcd = mask_to_points(mirr_mask, vertices, tex_coords)
+    obj_pcd = mask_to_points(obj_mask, vertices, tex_coords)
+    ref_pcd = mask_to_points(ref_mask, vertices, tex_coords)
+
+    print("saving point clouds individually")
+
+    o3d.io.write_point_cloud(os.path.join('data', 'outputs', f"{basename}_mirror.ply"), mirror_pcd)
+    o3d.io.write_point_cloud(os.path.join('data', 'outputs', f"{basename}_direct.ply"), obj_pcd)
+    o3d.io.write_point_cloud(os.path.join('data', 'outputs', f"{basename}_reflect.ply"), ref_pcd)
+
+    o3d.visualization.draw_geometries(
+        [mirror_pcd, obj_pcd, ref_pcd],
+        window_name="segmented color mapped point clouds",
+        width=800,
+        height=800,
+        left=50,
+        top=50,
+    )
