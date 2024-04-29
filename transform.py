@@ -69,3 +69,5 @@ def segment_point_clouds(
         left=50,
         top=50,
     )
+
+    return mirror_pcd, obj_pcd, ref_pcd

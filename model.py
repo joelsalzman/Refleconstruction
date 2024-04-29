@@ -5,6 +5,7 @@ import torch.nn as nn
 from sklearn.neighbors import BallTree
 from scipy.spatial import ConvexHull, distance
 import numpy as np
+import open3d as o3d
 
 class Reconstructor(nn.Module):
 
@@ -60,7 +61,7 @@ class Reconstructor(nn.Module):
         # Use SVD to find a plane to the points and find the plane normal
         _, _, vh = np.linalg.svd(points)
         normal = torch.from_numpy(vh[-1]).to(self.device)
-        self.sixdof.data = torch.cat([normal/torch.norm(normal), centroid])
+        self.sixdof.data = torch.cat([centroid, normal/torch.norm(normal)])
         assert self.sixdof.data.shape == (6,)
 
 
@@ -157,11 +158,6 @@ class Reconstructor(nn.Module):
         
         squared_curvatures = torch.pow(gaussian_curvatures, 2)
         return torch.mean(squared_curvatures[mask], dtype=torch.float32) * 1e10
-    
-  
-    def convex_hull(self, cloud):
-
-        pass
 
 
     def chamfer_distance(self, p1, p2):
@@ -202,3 +198,15 @@ class Reconstructor(nn.Module):
             loss = dist_loss
 
         return loss
+
+
+    @torch.no_grad()
+    def flip_o3d(self, pcd):
+
+        points = torch.tensor([np.asarray(pcd.points)]).to(self.device).squeeze()
+
+        reflected_points = self.reflect(points).cpu().numpy()
+
+        pcd.points = o3d.utility.Vector3dVector(reflected_points)
+
+        return pcd

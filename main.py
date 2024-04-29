@@ -64,6 +64,11 @@ if __name__ == '__main__':
 
     normal = compute_normal(match_points, depth, intrinsics)
 
-    segment_point_clouds(basename, rs, profile, depth_frame, color_frame, obj_mask, mirr_mask, ref_mask)
+    mirror_pcd, obj_pcd, ref_pcd = segment_point_clouds(
+        basename, rs, profile, depth_frame, color_frame, obj_mask, mirr_mask, ref_mask)
 
-    model = run_model(sixdof=normal)
+    model = run_model(basename=basename, sixdof=normal)
+
+    mirror_final = model.flip_o3d(mirror_pcd)
+    obj_final = model.flip_o3d(obj_pcd)
+    ref_final = model.flip_o3d(ref_pcd)

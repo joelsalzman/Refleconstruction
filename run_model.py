@@ -5,6 +5,7 @@ from model import Reconstructor
 # from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import os
+import open3d as o3d
 
 # if __name__ == '__main__':
 
