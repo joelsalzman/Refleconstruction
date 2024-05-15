@@ -28,6 +28,8 @@ We also experimented with having them select the mirror itself if possible.
   <table style="margin: auto;">
     <tr>
       <td><img src="media/premask.png" alt="Seed Points" width="1000"/></td>
+    </tr>
+    <tr>
       <td><img src="media/postmask.png" alt="Masked Depths" width="1000"/></td>
     </tr>
   </table>
@@ -70,7 +72,7 @@ The best method that we found to address this was to leverage the assumption tha
 corresponding visual features in both point clouds.
 We computed SIFT features in each mask, matched them, drew 3D vectors between each matching pair in the scene, 
 and averaged the vector bundle. 
-This worked even better than trying to segment the mirror plane and fit a plane to it using SVD.
+To our surprise, this worked much better than trying to segment the mirror frame and fit a plane to it using SVD.
 
 ### 4. Map textures
 
