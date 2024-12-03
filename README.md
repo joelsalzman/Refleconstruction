@@ -1,4 +1,4 @@
-# Reflecstruction
+# Refleconstruction
 ## Computational Imaging Project - Better 3D reconstruction using stereo through mirrors
 
 Nikolaus Holzer & Joel Salzman
